@@ -31,7 +31,7 @@ class NRAmc : public LteAmc
     unsigned int computeTbsFromNinfo(double nInfo, double coderate);
 
     //unsigned int computeCodewordTbs(UserTxParams* info, Codeword cw, Direction dir, unsigned int numRe);
-    std::tuple<int, double> computeCodewordTbs(UserTxParams* info, Codeword cw, Direction dir, unsigned int numRe);
+    std::tuple<int, double> computeCodewordTbs(UserTxParams* info, Codeword cw, Direction dir, unsigned int numRe, MacNodeId cellId);
 
   public:
 

@@ -1401,8 +1401,11 @@ double Binder::computeAndRecordProcessingDemand(LteAllocationModule *allocator, 
                 }
                 itUE++;
             }
-            info->lastBSProcDemand = BSProcDemand / info->CNProcCapacity;
-            return BSProcDemand / info->CNProcCapacity;
+            //info->lastBSProcDemand = BSProcDemand / info->CNProcCapacity;
+            //return BSProcDemand / info->CNProcCapacity;
+            if (BSProcDemand > 0)
+                info->lastBSProcDemand = BSProcDemand;
+            return BSProcDemand;
         }
     }
     return -1;
@@ -1435,23 +1438,29 @@ double Binder::computeBSProcessingDemand(LteAllocationModule *allocator)
                     double pd = infoUE->lastProcDemand;
                     int UEAllocatedRBs = allocator->getBlocks(infoUE->id);
                     BSProcDemand += pd * UEAllocatedRBs/5;
-                    infoUE->fullLastProcDemand = BSProcDemand; //saving the user' proc demand (full equation)
+                    if (BSProcDemand > 0)
+                        infoUE->fullLastProcDemand = BSProcDemand; //saving the user' proc demand (full equation)
                 }
                 itUE++;
             }
-            info->lastBSProcDemand = BSProcDemand / info->CNProcCapacity;
-            return BSProcDemand / info->CNProcCapacity;
+            //info->lastBSProcDemand = BSProcDemand / info->CNProcCapacity;
+            if (BSProcDemand > 0)
+                info->lastBSProcDemand = BSProcDemand;
+            return BSProcDemand;
         }
     }
     return -1;
 }
 
-double Binder::computeClusterProcessingDemand(LteAllocationModule *allocator, MacNodeId nodeId)
+
+std::tuple<double, double> Binder::computeClusterProcessingDemand(LteAllocationModule *allocator, MacNodeId nodeId)
 {
     double BSProcDemand = 0;
+    double BSCapacity = 0;
     for (const auto& outer_pair : placementSolution) {
         MacNodeId outer_key = outer_pair.first;
         if (outer_key == nodeId) {
+            BSCapacity = getCNProcCapacity(outer_key);
             const auto& inner_map = outer_pair.second;
 
             for (const auto& inner_pair : inner_map) {
@@ -1472,6 +1481,212 @@ double Binder::computeClusterProcessingDemand(LteAllocationModule *allocator, Ma
             }
         }
     }
-    return BSProcDemand;
+    return {BSProcDemand, BSProcDemand / BSCapacity};
 
+}
+
+void Binder::applyPolicy(MacNodeId nodeId, double clusterCost)
+{
+    std::vector<EnbInfo*>::iterator it = find_if(enbList_.begin(), enbList_.end(), [&nodeId](EnbInfo *bs){
+                    return bs->id == nodeId;
+    });
+    while(it != enbList_.end() )
+    {
+        EnbInfo* info = *it;
+        if (info->id == nodeId){
+            //policy 1 == cqi downgrade
+            if (info->reductionPolicy == 1){
+                //check and/or change the CQI for the cluster' anchor
+                int res = changeCurrentMaxCQI(nodeId, clusterCost, info->CNProcCapacity);
+                if (res != 0){
+                    //running for the cluster' BSs
+                    for (const auto& outer_pair : placementSolution) {
+                            MacNodeId outer_key = outer_pair.first;
+                            if (outer_key == nodeId){
+                                const auto& inner_map = outer_pair.second;
+                                for (const auto& inner_pair : inner_map) {
+                                   MacNodeId inner_key = inner_pair.first;
+                                   if (inner_key != nodeId)
+                                       if (res < 0){
+                                           changeCurrentMaxCQI(inner_key,1,0); //force the downgrade
+                                           //set that this BS was downgraded by the upper CN
+                                           downgradedByUpperCN[inner_key - 1] = true;
+                                       }else{
+                                           changeCurrentMaxCQI(inner_key,0,1); //force to up grade
+                                           //set that this BS was downgraded by the upper CN
+                                           downgradedByUpperCN[inner_key - 1] = false;
+                                       }
+                                }
+                            }
+                    }
+                }
+            }
+            if (info->reductionPolicy == 2){
+                //policy 2 == RI downgrade
+                if (info->CNProcCapacity < clusterCost){
+                    if (currentMaxRI_[nodeId - 1] > 2){
+                        currentMaxRI_[nodeId - 1] -= 2;
+                        currentLayers_[nodeId - 1]-= 2;
+                    }
+                    //running for the cluster' BSs
+                    for (const auto& outer_pair : placementSolution) {
+                        MacNodeId outer_key = outer_pair.first;
+                        if (outer_key == nodeId){
+                            const auto& inner_map = outer_pair.second;
+                            for (const auto& inner_pair : inner_map) {
+                                MacNodeId inner_key = inner_pair.first;
+                                if (inner_key != nodeId)
+                                    if (currentMaxRI_[inner_key - 1] > 2){
+                                        currentMaxRI_[inner_key - 1] -= 2;
+                                        currentLayers_[inner_key - 1]-= 2;
+                                        //set that this BS was downgraded by the upper CN
+                                        downgradedByUpperCN[inner_key - 1] = true;
+                                    }
+                            }
+                        }
+                    }
+                }else{
+                    if (!downgradedByUpperCN[nodeId - 1]){
+                        currentMaxRI_[nodeId - 1]  = originalCurrentMaxRI_[nodeId - 1];
+                        currentLayers_[nodeId - 1] = originalCurrentLayers_[nodeId - 1];
+                        //running for the cluster' BSs
+                        for (const auto& outer_pair : placementSolution) {
+                            MacNodeId outer_key = outer_pair.first;
+                            if (outer_key == nodeId){
+                                const auto& inner_map = outer_pair.second;
+                                for (const auto& inner_pair : inner_map) {
+                                    MacNodeId inner_key = inner_pair.first;
+                                    if (inner_key != nodeId)
+                                        currentMaxRI_[inner_key - 1] = originalCurrentMaxRI_[inner_key - 1];
+                                        currentLayers_[inner_key - 1]= originalCurrentLayers_[inner_key - 1];
+                                        //set that this BS wasn't downgraded by the upper CN
+                                        downgradedByUpperCN[inner_key - 1] = false;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            break;
+        }
+        it++;
+    }
+
+}
+
+/*
+ * if the return is 0 == void
+ * if return is -1, CQI was downgraded
+ * if return is +1, CQI was upgraded
+ */
+int Binder::changeCurrentMaxCQI(MacNodeId nodeId, double clusterCost, double CNProcCapacity){
+    int res = 0;
+    //check if the capacity was exhausted
+    int currentCqi = getCurrentMaxCQI(nodeId);
+    if (CNProcCapacity < clusterCost){
+        if (currentCqi > 1){
+            updateCurrentMaxCQI(nodeId, currentCqi - 1);
+            res = -1;
+        }
+    }else{
+        if (enbListOverflow_[nodeId-1] >= 0){
+            if (currentCqi < 15 and !downgradedByUpperCN[nodeId - 1]){
+                updateCurrentMaxCQI(nodeId, currentCqi + 1);
+                res = 1;
+            }
+            enbListOverflow_[nodeId-1] = 0;
+        }else
+            enbListOverflow_[nodeId-1] += 1;
+    }
+    return res;
+}
+
+//!VH
+void Binder::proccessPeriodicMonitoring(){
+    std::vector<bool> enbStatus;
+    std:vector<double> state;
+    bool anyTrueHigh = false;
+    bool anyTrueLow = false;
+    //iterate over all BS set
+    std::vector<EnbInfo*>::iterator it = enbList_.begin(), et = enbList_.end();
+    for ( ; it != et; ++it)
+    {
+        EnbInfo* info = *it;
+        state.push_back(info->lastBSProcDemandProportion);//Saving the state_t
+        if (info->lastBSProcDemandProportion > 1.0){
+            enbStatus.push_back(true);
+            anyTrueHigh = true;
+        }else{
+            enbStatus.push_back(false);
+            anyTrueLow = true;
+        }
+    }
+    resetPeriodicMonitoringCounter();
+
+    if (anyTrueHigh){
+        //downgrade the solution to D-RANs
+        setPlacementSolution("{\"2\": {\"2\": 1.0}}");
+        setPlacementSolution("{\"3\": {\"3\": 1.0}}");
+    }else if (anyTrueLow){
+        setPlacementSolution("{\"2\": {\"2\": 0.7}}");
+        setPlacementSolution("{\"3\": {\"3\": 1.0, \"2\": 0.3}}");
+    }
+
+}
+
+//!VH change network demand
+void Binder::changeScenario(){
+
+    if ((getTimer()/1000) % 2 != 0){
+        //reducing drastically the cost
+        //iterate over all BS set
+        std::vector<EnbInfo*>::iterator it = enbList_.begin(), et = enbList_.end();
+        for ( ; it != et; ++it)
+        {
+            EnbInfo* info = *it;
+            //firstly we set the maxCQI to at least 5, or a half if higher than 10
+            //int currentCqi = (getCurrentMaxCQI(info->id) / 2 < 2) ? 2 : static_cast<int>(getCurrentMaxCQI(info->id) / 2);
+            int currentCqi = 1;
+            updateCurrentMaxCQI(info->id, currentCqi);
+
+            //secondly we downgrade the RI and number of layers
+            /*if (currentMaxRI_[info->id - 1] > 2){
+                currentMaxRI_[info->id - 1] -= 2;
+                currentLayers_[info->id - 1]-= 2;
+                //set that this BS was downgraded by the upper CN
+                downgradedByUpperCN[info->id - 1] = true;
+            }*/
+        }
+    }else{
+        //recovering to the max cost
+        //iterate over all BS set
+        std::vector<EnbInfo*>::iterator it = enbList_.begin(), et = enbList_.end();
+        for ( ; it != et; ++it)
+        {
+            EnbInfo* info = *it;
+            updateCurrentMaxCQI(info->id, 15);
+
+            /*//secondly we downgrade the RI and number of layers
+            currentMaxRI_[info->id - 1] = originalCurrentMaxRI_[info->id - 1];
+            currentLayers_[info->id - 1]= originalCurrentLayers_[info->id - 1];
+            //set that this BS wasn't downgraded by the upper CN
+            downgradedByUpperCN[info->id - 1] = false;*/
+
+        }
+    }
+    //resetTimer();
+
+}
+
+//!VH search current cellId for the UE
+MacNodeId Binder::findUeInfoCellId(MacNodeId id)
+{
+    std::vector<UeInfo*>::iterator it = ueList_.begin();
+    for (; it != ueList_.end(); ++it)
+    {
+        if ((*it)->id == id)
+        {
+            return (*it)->cellId;
+        }
+    }
 }

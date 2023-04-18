@@ -143,7 +143,8 @@ class LteMacEnbD2D : public LteMacEnb
     /*
      * getter
      */
-    UserTxParams* getPreconfiguredTxParams(){
+    //!VH update method to receive the cell MacNodeId
+    UserTxParams* getPreconfiguredTxParams(MacNodeId id){
 
         return preconfiguredTxParams_;
     }

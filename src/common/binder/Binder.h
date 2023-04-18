@@ -79,6 +79,8 @@ class Binder : public omnetpp::cSimpleModule
 
     // list of all eNBs. Used for inter-cell interference evaluation
     std::vector<EnbInfo*> enbList_;
+    //!VH controller for downgraded BSs
+    std::vector<bool> downgradedByUpperCN;
 
     // list of all UEs. Used for inter-cell interference evaluation
     std::vector<UeInfo*> ueList_;
@@ -96,6 +98,10 @@ class Binder : public omnetpp::cSimpleModule
 
     MacNodeId macNodeIdCounter_[3]; // MacNodeId Counter
     DeployedUesMap dMap_; // DeployedUes --> Master Mapping
+
+    //!VH define the enb overflow counter
+    std::vector<double> enbListOverflow_;
+
 
     /*
      * Carrier Aggregation support
@@ -529,6 +535,10 @@ class Binder : public omnetpp::cSimpleModule
     void addEnbInfo(EnbInfo* info)
     {
         enbList_.push_back(info);
+        //!VH init enbListOverflow_ vector
+        enbListOverflow_.push_back(0);
+        //!VH setting up the default value, i.e., this BS was never downgraded
+        downgradedByUpperCN.push_back(false);
     }
 
     std::vector<EnbInfo*> * getEnbList()
@@ -608,6 +618,7 @@ class Binder : public omnetpp::cSimpleModule
     void removeHandoverTriggered(MacNodeId nodeId);
 
     void updateUeInfoCellId(MacNodeId nodeId, MacCellId cellId);
+    MacNodeId findUeInfoCellId(MacNodeId id); //!VH function to search a specific UE
 
     /*
      *  Background UEs and cells Support
@@ -649,12 +660,21 @@ class Binder : public omnetpp::cSimpleModule
     //VH dynamic configuration
     /// the running TxMode, number of layers and RI
     int currentTxModeId_;
-    int currentLayers_;
-    int currentMaxRI_;
+    std::vector<int> currentLayers_;
+    std::vector<int> currentMaxRI_;
     int currentMaxModOrder_; //!VH max allowed modulation order
     int currentMaxRBs_; // !VH max allowed resource blocks / BW
     int currentMaxCQI_; //!VH max allowed CQI. In fact, it can be the same as the maximum modulation order, but it makes the process easier.
+    std::vector<int> currentMaxCQI;
+    std::vector<int> reductionPolicy_;
     std::vector<int> CNProcCapacity;
+    std::vector<int> originalCurrentLayers_;
+    std::vector<int> originalCurrentMaxRI_;
+    int placementSolutionDelay_; //!VH time to receive a solution from the solver, in TTIs
+    int placementSolultionDelayCounter; //counter/timer
+    int periodicMonitoring_; //!VH time to employ a periodic monitoring
+    int periodicMonitoringCounter_; //!VH counting the elapsed TTIs until the periodic monitoring can be employed
+    int timer;
     //std::map<MacNodeId, double> placementSolution;
     std::unordered_map<MacNodeId, std::unordered_map<MacNodeId, double>> placementSolution;
     std::unordered_map<MacNodeId, std::unordered_map<MacNodeId, double>> placementSolutionA;
@@ -667,11 +687,13 @@ class Binder : public omnetpp::cSimpleModule
 
     void setCurrentLayers(int numLayers)
     {
-        currentLayers_ = numLayers;
+        currentLayers_.push_back(numLayers);
+        originalCurrentLayers_.push_back(numLayers);
     }
     void setCurrentMaxRI(int maxRI)
     {
-        currentMaxRI_ = maxRI;
+        currentMaxRI_.push_back(maxRI);
+        originalCurrentMaxRI_.push_back(maxRI);
     }
     void setCurrentMaxModOrder(int maxModOrder)
     {
@@ -683,13 +705,28 @@ class Binder : public omnetpp::cSimpleModule
     }
     void setCurrentMaxCQI(int maxCQI)
     {
-        currentMaxCQI_ = maxCQI;
+        //currentMaxCQI_ = maxCQI;
+        currentMaxCQI.push_back(maxCQI);
+    }
+    void updateCurrentMaxCQI(int id, int maxCQI){
+        currentMaxCQI[id-1] = maxCQI;
     }
     void setCNProcCapacity(int procCapacity)
     {
         CNProcCapacity.push_back(procCapacity);
     }
-
+    void setLastBSProcDemandProportion(MacNodeId nodeId, double costProp)
+    {
+        std::vector<EnbInfo*>::iterator it = enbList_.begin(), et = enbList_.end();
+        for ( ; it != et; ++it)
+        {
+            EnbInfo* info = *it;
+            if (info->id == nodeId){
+                info->lastBSProcDemandProportion = costProp;
+                break;
+            }
+        }
+    }
     void setPlacementSolution_old(std::string pSolution)
     {
         std::stringstream ss(pSolution);
@@ -759,18 +796,69 @@ class Binder : public omnetpp::cSimpleModule
         }
     }
 
+    void setPlacementSolutionDelay(int time){
+        placementSolutionDelay_ = time;
+    }
+
+    void setReductionPolicy(int reductionPolicy) {
+        reductionPolicy_.push_back(reductionPolicy);
+    }
+
+    void incPlacementSolutionDelayCounter(){
+        placementSolultionDelayCounter += 1;
+    }
+
+    void resetPlacementSolutionDelayCounter(){
+        placementSolultionDelayCounter = 0;
+    }
+    void setPeriodicMonitoring(int time){
+        periodicMonitoring_ = time;
+    }
+    int getPeriodicMonitoring(){
+        return periodicMonitoring_;
+    }
+    void incPeriodicMonitoringCounter(){
+        periodicMonitoringCounter_ += 1;
+    }
+    void resetPeriodicMonitoringCounter(){
+        periodicMonitoringCounter_ = 0;
+    }
+    void incTimer(){
+        timer++;
+    }
+    void resetTimer(){
+        timer = 0;
+    }
+    int getTimer(){
+        return timer;
+    }
+    int getPeriodicMonitoringCounter(){
+        return periodicMonitoringCounter_;
+    }
+    int getPlacementSolultionDelayCounter(){
+        return placementSolultionDelayCounter;
+    }
+
+    double getPlacementSolutionDelay(){
+        return placementSolutionDelay_;
+    }
+
+    int getReductionPolicy(MacNodeId id){
+        return reductionPolicy_[id - 1];
+    }
+
     int getCurrentTxModeId()
     {
         return currentTxModeId_;
     }
 
-    int getCurrentLayers()
+    int getCurrentLayers(MacNodeId id)
     {
-        return currentLayers_;
+        return currentLayers_[id - 1];
     }
-    int getCurrentMaxRI()
+    int getCurrentMaxRI(MacNodeId id)
     {
-        return currentMaxRI_;
+        return currentMaxRI_[id - 1];
     }
     int getCurrentMaxModOrder()
     {
@@ -780,13 +868,13 @@ class Binder : public omnetpp::cSimpleModule
     {
         return currentMaxRBs_;
     }
-    int getCurrentMaxCQI()
+    int getCurrentMaxCQI(int id)
     {
-        return currentMaxCQI_;
+        return currentMaxCQI[id-1];
     }
     int getCNProcCapacity(int id)
     {
-        return CNProcCapacity[id];
+        return CNProcCapacity[id-1];
     }
     int getLastEnbInfo()
     {
@@ -800,7 +888,11 @@ class Binder : public omnetpp::cSimpleModule
     //void computeAndRecordProcessingDemand(LteAllocationModule *allocator);
     double computeAndRecordProcessingDemand(LteAllocationModule *allocator, MacNodeId nodeId);
     double computeBSProcessingDemand(LteAllocationModule *allocator);
-    double computeClusterProcessingDemand(LteAllocationModule *allocator, MacNodeId nodeId);
+    std::tuple<double, double> computeClusterProcessingDemand(LteAllocationModule *allocator, MacNodeId nodeId);
+    void applyPolicy(MacNodeId nodeId, double clusterCost);
+    int changeCurrentMaxCQI(MacNodeId nodeId, double clusterCost, double CNProcCapacity);
+    void proccessPeriodicMonitoring();
+    void changeScenario();
 };
 
 #endif

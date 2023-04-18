@@ -63,7 +63,7 @@ void LteMacUeD2D::initialize(int stage)
 
         if (cellId_ > 0)
         {
-            preconfiguredTxParams_ = getPreconfiguredTxParams();
+            preconfiguredTxParams_ = getPreconfiguredTxParams(cellId_);
 
             // get the reference to the eNB
             enb_ = check_and_cast<LteMacEnbD2D*>(getMacByMacNodeId(cellId_));
@@ -931,8 +931,9 @@ void LteMacUeD2D::handleSelfMessage()
     EV << "--- END UE MAIN LOOP ---" << endl;
 }
 
-
-UserTxParams* LteMacUeD2D::getPreconfiguredTxParams()
+//!VH update method to receive MacNodeId
+//original version UserTxParams* LteMacUeD2D::getPreconfiguredTxParams()
+UserTxParams* LteMacUeD2D::getPreconfiguredTxParams(MacNodeId id)
 {
     UserTxParams* txParams = new UserTxParams();
 
@@ -943,7 +944,7 @@ UserTxParams* LteMacUeD2D::getPreconfiguredTxParams()
     //txParams->writeTxMode(SINGLE_ANTENNA_PORT0);
     //txParams->writeTxMode(OL_SPATIAL_MULTIPLEXING);
     //VH _RI
-    Rank ri = getBinder()->getCurrentMaxRI();                                              // rank for TxD is one
+    Rank ri = getBinder()->getCurrentMaxRI(id);                                              // rank for TxD is one
     txParams->writeRank(ri);
     txParams->writePmi(intuniform(1, pow(ri, (double) 2)));   // taken from LteFeedbackComputationRealistic::computeFeedback
 
@@ -1205,7 +1206,7 @@ void LteMacUeD2D::doHandover(MacNodeId targetEnb)
     {
         if (preconfiguredTxParams_ != nullptr)
             delete preconfiguredTxParams_;
-        preconfiguredTxParams_ = getPreconfiguredTxParams();
+        preconfiguredTxParams_ = getPreconfiguredTxParams(targetEnb);
         enb_ = check_and_cast<LteMacEnbD2D*>(getMacByMacNodeId(targetEnb));
     }
     LteMacUe::doHandover(targetEnb);

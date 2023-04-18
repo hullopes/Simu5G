@@ -916,7 +916,7 @@ unsigned int LteAmc::computeBitsPerRbBackground(Cqi cqi, const Direction dir, do
 
     unsigned char layers = 1; //!VH _layers > 1 only for SM txMode
     if (getBinder()->getCurrentTxModeId() == 3)
-        layers = getBinder()->getCurrentLayers();
+        layers = getBinder()->getCurrentLayers(1);
     //VH _txMode
     const unsigned int* tbsVect = itbs2tbs(mod, TxMode(getBinder()->getCurrentTxModeId()), layers, iTbs - i);
     //const unsigned int* tbsVect = itbs2tbs(mod, SINGLE_ANTENNA_PORT0, layers, iTbs - i);

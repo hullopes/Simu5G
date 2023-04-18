@@ -37,10 +37,10 @@ LteFeedbackComputationRealistic::~LteFeedbackComputationRealistic()
 }
 
 void LteFeedbackComputationRealistic::generateBaseFeedback(int numBands, int numPreferredBands, LteFeedback& fb,
-    FeedbackType fbType, int cw, RbAllocationType rbAllocationType, TxMode txmode, std::vector<double> snr)
+    FeedbackType fbType, int cw, RbAllocationType rbAllocationType, TxMode txmode, std::vector<double> snr, MacNodeId cellId)
 {
     //VH _layer
-    int layer = getBinder()->getCurrentLayers();
+    int layer = getBinder()->getCurrentLayers(cellId);
     //if (getBinder()->getCurrentTxModeId() == 3)
     //    layer = getBinder()->getCurrentLayers();
 
@@ -110,7 +110,7 @@ unsigned int LteFeedbackComputationRealistic::computeRank(MacNodeId id)
         return 1;
     else
         //VH _RI computeRank
-        return getBinder()->getCurrentMaxRI();
+        return getBinder()->getCurrentMaxRI(getBinder()->findUeInfoCellId(id));
 }
 
 Cqi LteFeedbackComputationRealistic::getCqi(TxMode txmode, double snr)
@@ -178,7 +178,7 @@ LteFeedbackDoubleVector LteFeedbackComputationRealistic::computeFeedback(Feedbac
                 fb.setWideBandPmi(intuniform(getEnvir()->getRNG(0), 1, pow(rank, (double) 2)));
                 //generate feedback for txmode z
                 generateBaseFeedback(numBands_, numPreferredBands, fb, fbType, antennaCws[(Remote) j], rbAllocationType,
-                    (TxMode) z, snr);
+                    (TxMode) z, snr, getBinder()->findUeInfoCellId(id));
             }
             // add the feedback to the feedback structure
             LteFeedback fb2 = fb;
@@ -221,7 +221,7 @@ LteFeedbackVector LteFeedbackComputationRealistic::computeFeedback(const Remote 
             fb.setWideBandPmi(intuniform(getEnvir()->getRNG(0), 1, pow(rank, (double) 2)));
             //generate feedback for txmode z
             generateBaseFeedback(numBands_, numPreferredBands, fb, fbType, antennaCws, rbAllocationType, (TxMode) z,
-                snr);
+                snr, getBinder()->findUeInfoCellId(id));
         }
         // add the feedback to the feedback structure
         LteFeedback fb2 = fb;
@@ -258,7 +258,7 @@ LteFeedback LteFeedbackComputationRealistic::computeFeedback(const Remote remote
     //set the remote in feedback object
     fb.setAntenna(remote);
     fb.setTxMode(txmode);
-    generateBaseFeedback(numBands_, numPreferredBands, fb, fbType, antennaCws, rbAllocationType, txmode, snr);
+    generateBaseFeedback(numBands_, numPreferredBands, fb, fbType, antennaCws, rbAllocationType, txmode, snr, getBinder()->findUeInfoCellId(id));
     // set pmi only for cl smux and mumimo
     if (txmode == CL_SPATIAL_MULTIPLEXING || txmode == MULTI_USER)
     {

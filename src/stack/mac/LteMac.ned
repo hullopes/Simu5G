@@ -252,6 +252,12 @@ simple LteMacEnb extends LteMacBase {
         //!VH statistics for CN
         @signal[CNProcDemand];
         @statistic[CNProcDemand](title="Avg CN processing demand"; unit="GOPS"; source="CNProcDemand"; record=mean,vector);
+        @signal[CNProcDemandProportion];
+        @statistic[CNProcDemandProportion](title="Avg CN processing demand proportional to the CN processing capacity"; unit="GOPS"; source="CNProcDemandProportion"; record=mean,vector);
+        @signal[currentMaxCQI];
+        @statistic[currentMaxCQI](title="Max allowed CQI"; unit="CQI"; source="currentMaxCQI"; record=mean,vector);
+        @signal[currentMaxRI];
+        @statistic[currentMaxRI](title="Max allowed RI"; unit="RI"; source="currentMaxRI"; record=mean,vector);
 }    
 
 //

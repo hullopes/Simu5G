@@ -113,6 +113,9 @@ class LteSchedulerEnb
 
     //!VH CN statistics
     omnetpp::simsignal_t CNProcDemand_;
+    omnetpp::simsignal_t CNProcDemandProportion_;
+    omnetpp::simsignal_t currentMaxCQI_;
+    omnetpp::simsignal_t currentMaxRI_;
 
     // pre-made BandLimit structure used when the no band limit is given to the scheduler
     std::vector<BandLimit> emptyBandLim_;

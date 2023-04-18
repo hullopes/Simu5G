@@ -114,7 +114,7 @@ unsigned int NRAmc::computeTbsFromNinfo(double nInfo, double coderate)
 }
 
 //unsigned int NRAmc::computeCodewordTbs(UserTxParams* info, Codeword cw, Direction dir, unsigned int numRe)
-std::tuple<int, double> NRAmc::computeCodewordTbs(UserTxParams* info, Codeword cw, Direction dir, unsigned int numRe)
+std::tuple<int, double> NRAmc::computeCodewordTbs(UserTxParams* info, Codeword cw, Direction dir, unsigned int numRe, MacNodeId cellId)
 {
     std::vector<unsigned char> layers = info->getLayers();
     //NRMCSelem mcsElem = getMcsElemPerCqi(info->readCqiVector().at(cw), dir);
@@ -123,8 +123,8 @@ std::tuple<int, double> NRAmc::computeCodewordTbs(UserTxParams* info, Codeword c
     if (cw < info->readCqiVector().size()){
         Cqi cqi = info->readCqiVector().at(cw);
         //!VH CQI downgrade
-        if (cqi > getBinder()->getCurrentMaxCQI())
-            cqi = getBinder()->getCurrentMaxCQI();
+        if (cqi > getBinder()->getCurrentMaxCQI(cellId))
+            cqi = getBinder()->getCurrentMaxCQI(cellId);
         mcsElem = getMcsElemPerCqi(cqi, dir);
         //mcsElem = getMcsElemPerCqi(info->readCqiVector().at(cw), dir);
     } else {
@@ -143,7 +143,7 @@ std::tuple<int, double> NRAmc::computeCodewordTbs(UserTxParams* info, Codeword c
     int l = layers.at(cw);
     //VH _layers
     if (getBinder()->getCurrentTxModeId() == 3)
-            l = getBinder()->getCurrentLayers();
+            l = getBinder()->getCurrentLayers(cellId);
     double nInfo = numRe * coderate * modFactor * l;
 
     //VH computing CN GOPS
@@ -186,7 +186,7 @@ unsigned int NRAmc::computeReqRbs(MacNodeId id, Band b, Codeword cw, unsigned in
     for(j = 0; j < 110; ++j)   // TODO check number of blocks
     {
         //!VH Changing method
-        auto [ptbs, tbsCost] = computeCodewordTbs(&info, cw, dir, numRe);
+        auto [ptbs, tbsCost] = computeCodewordTbs(&info, cw, dir, numRe, getBinder()->findUeInfoCellId(id));
         //if(computeCodewordTbs(&info, cw, dir, numRe) >= bits)
         if(ptbs >= bits)
             break;
@@ -225,7 +225,7 @@ unsigned int NRAmc::computeBitsOnNRbs(MacNodeId id, Band b, unsigned int blocks,
             continue;
         }
         //!VH Changing method
-        auto [ptbs, tbsCost] = computeCodewordTbs(&info, cw, dir, numRe);
+        auto [ptbs, tbsCost] = computeCodewordTbs(&info, cw, dir, numRe, getBinder()->findUeInfoCellId(id));
         //unsigned int tbs = computeCodewordTbs(&info, cw, dir, numRe);
         unsigned int tbs = ptbs;
         bits += tbs;
@@ -267,7 +267,7 @@ unsigned int NRAmc::computeBitsOnNRbs(MacNodeId id, Band b, Codeword cw, unsigne
 
     //unsigned int tbs = computeCodewordTbs(&info, cw, dir, numRe);
     //!VH Changing method
-    auto [ptbs, tbsCost] = computeCodewordTbs(&info, cw, dir, numRe);
+    auto [ptbs, tbsCost] = computeCodewordTbs(&info, cw, dir, numRe, getBinder()->findUeInfoCellId(id));
     unsigned int tbs = ptbs;
 
     // DEBUG

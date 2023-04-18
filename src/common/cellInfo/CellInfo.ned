@@ -97,4 +97,8 @@ simple CellInfo {
         int CNProcCapacity = default(1000); //in GOPS
         string placementSolution = default("{}");
         bool RU = default(true);
+        int reductionPolicy = default(1);
+        int placementSolutionDelay = default(0);
+        int periodicMonitoring = default(0);
+        
 }

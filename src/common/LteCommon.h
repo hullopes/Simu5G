@@ -540,6 +540,8 @@ struct EnbInfo
     int x2;
     double lastBSProcDemand;  // last calculated BS's processing demand (Eq.)
     double CNProcCapacity; // Computing Node computational processing capacity (in GOPS)
+    int reductionPolicy;
+    double lastBSProcDemandProportion;
 
 };
 

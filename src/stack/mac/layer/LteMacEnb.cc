@@ -188,7 +188,9 @@ void LteMacEnb::initialize(int stage)
         info->init = false;            // flag for phy initialization
         info->eNodeB = this->getParentModule()->getParentModule();  // reference to the eNodeB module
         //!VH add CN processing capacity (from ned and .ini)
-        info->CNProcCapacity = binder_->getCNProcCapacity(binder_->getLastEnbInfo());
+        info->CNProcCapacity = binder_->getCNProcCapacity(nodeId_);
+        info->reductionPolicy = binder_->getReductionPolicy(nodeId_);
+        info->lastBSProcDemandProportion = 0.0; //!VH to save the last calculated BS/cluster cost (also will be part of the observation state)
         binder_->addEnbInfo(info);
 
         // register the pairs <id,name> and <id, module> to the binder

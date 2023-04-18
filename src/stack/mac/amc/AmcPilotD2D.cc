@@ -26,7 +26,7 @@ void AmcPilotD2D::setPreconfiguredTxParams(Cqi cqi)
     //preconfiguredTxParams_->writeTxMode(SINGLE_ANTENNA_PORT0);
     //preconfiguredTxParams_->writeTxMode(OL_SPATIAL_MULTIPLEXING);
     //VH _RI
-    Rank ri = binder_->getCurrentMaxRI();                                              // rank for TxD is one
+    Rank ri = binder_->getCurrentMaxRI(1);                                              // rank for TxD is one
     preconfiguredTxParams_->writeRank(ri);
     preconfiguredTxParams_->writePmi(intuniform(getEnvir()->getRNG(0),1, pow(ri, (double) 2)));   // taken from LteFeedbackComputationRealistic::computeFeedback
 

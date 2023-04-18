@@ -65,6 +65,7 @@ void CellInfo::initialize(int stage)
         currentMaxRBs_ = par("currentMaxRBs");
         currentMaxCQI_ = par("currentMaxCQI");
         CNProcCapacity_ = par("CNProcCapacity");
+        reductionPolicy_ = par("reductionPolicy");
         //hasRU_ = par("hasRU");
         //placementSolution_ = par("placementSolution");
 
@@ -76,6 +77,12 @@ void CellInfo::initialize(int stage)
         binder_->setCurrentMaxCQI(currentMaxCQI_);
         binder_->setCNProcCapacity(CNProcCapacity_);
         binder_->setPlacementSolution(par("placementSolution"));
+        binder_->setReductionPolicy(reductionPolicy_);
+        binder_->setPlacementSolutionDelay(par("placementSolutionDelay"));
+        binder_->setPeriodicMonitoring(par("periodicMonitoring"));
+        binder_->resetPlacementSolutionDelayCounter();
+        binder_->resetPeriodicMonitoringCounter();
+        binder_->resetTimer();
 
     }
     if (stage == inet::INITSTAGE_LOCAL+1)

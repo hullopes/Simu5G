@@ -61,6 +61,9 @@ network MultiCell_Standalone_3cells
         iUpf: Upf {
             @display("p=500,215");
         }
+        gnb1: gNodeB {
+            @display("p=678.40497,73.71;is=vl");
+        }
         gnb2: gNodeB {
             @display("p=250,300;is=vl");
         }
@@ -73,9 +76,7 @@ network MultiCell_Standalone_3cells
         ue[numUe]: NRUe {
             @display("p=499.056,428.244");
         }
-        gnb1: gNodeB {
-            @display("p=678.40497,73.71;is=vl");
-        }
+        
     connections:
 
         //# Data Network connections

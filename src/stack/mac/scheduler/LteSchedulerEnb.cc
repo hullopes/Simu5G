@@ -136,6 +136,10 @@ void LteSchedulerEnb::initialize(Direction dir, LteMacEnb* mac)
 
     //!VH init statistics
     CNProcDemand_ = mac_->registerSignal("CNProcDemand");
+    CNProcDemandProportion_ = mac_->registerSignal("CNProcDemandProportion");
+    currentMaxCQI_ = mac_->registerSignal("currentMaxCQI");
+    currentMaxRI_ = mac_->registerSignal("currentMaxRI");
+
 }
 
 void LteSchedulerEnb::initializeSchedulerPeriodCounter(NumerologyIndex maxNumerologyIndex)
@@ -190,6 +194,16 @@ std::map<double, LteMacScheduleList>* LteSchedulerEnb::schedule()
     resourceBlockStatistics();
     // compute and record the CN computing demand
     CNStatistics(mac_->getMacNodeId());
+    //!VH long term agent trigger - periodic monitoring
+    if (getBinder()->getPeriodicMonitoringCounter() < getBinder()->getPeriodicMonitoring())
+        getBinder()->incPeriodicMonitoringCounter();
+    else
+        getBinder()->proccessPeriodicMonitoring();
+
+    getBinder()->incTimer();//!VH inc general timer
+
+    if (getBinder()->getTimer() % 1000 == 0)
+        getBinder()->changeScenario();
 
     return &scheduleList_;
 }
@@ -381,6 +395,7 @@ unsigned int LteSchedulerEnb::scheduleGrant(MacCid cid, unsigned int bytes, bool
 
     // Retrieve the first free codeword checking the eligibility - check eligibility could modify current cw index.
     Codeword cw = 0; // current codeword, modified by reference by the checkeligibility function
+    Codeword o_cw = 0;
     if (!checkEligibility(nodeId, cw, carrierFrequency) || cw >= numCodewords)
     {
         eligible = false;
@@ -425,7 +440,16 @@ unsigned int LteSchedulerEnb::scheduleGrant(MacCid cid, unsigned int bytes, bool
         {
             // save the band and the relative limit
             Band b = (*bandLim).at(i).band_;
-            int limit = (*bandLim).at(i).limit_.at(cw);
+            //VH correcting error
+            int limit = -1;
+            try{
+                limit = (*bandLim).at(i).limit_.at(cw);
+            }catch(std::exception& e){
+                o_cw = cw;
+                cw = 0;
+                limit = (*bandLim).at(i).limit_.at(cw);
+            }
+            //int limit = (*bandLim).at(i).limit_.at(0); //VH TODO: check out the error (.at(cs)) when running MaxCiCoMP scheduler
             EV << "LteSchedulerEnb::grant --- BAND " << b << " LIMIT " << limit << "---" << endl;
 
             // if the limit flag is set to skip, jump off
@@ -592,6 +616,8 @@ unsigned int LteSchedulerEnb::scheduleGrant(MacCid cid, unsigned int bytes, bool
         }
         if (stop)
             break;
+        //VH correcting error
+        cw = o_cw;
     } // Closes loop on Codewords
 
     EV << "LteSchedulerEnb::grant Total allocation: " << totalAllocatedBytes << " bytes, " << totalAllocatedBlocks << " blocks" << endl;
@@ -1110,9 +1136,17 @@ void LteSchedulerEnb::CNStatistics(MacNodeId nodeId)
     //    mac_->emit(CNProcDemand_, cost);
     //TODO - move it to the correct place, i.e., the simulator BS "foreach" (not found yet)
     //computing for every cluster
-    double clusterCost = getBinder()->computeClusterProcessingDemand(allocator_, nodeId);
-    if (clusterCost > 0.0)
+
+    auto [clusterCost, costProp]= getBinder()->computeClusterProcessingDemand(allocator_, nodeId);
+    if (clusterCost > 0.0){
         mac_->emit(CNProcDemand_, clusterCost);
+        mac_->emit(CNProcDemandProportion_, costProp);
+        getBinder()->setLastBSProcDemandProportion(nodeId, costProp); //saving the calculated cost proportion
+        //check and apply the current reduction policy, if necessary
+        getBinder()->applyPolicy(nodeId, clusterCost);
+        mac_->emit(currentMaxCQI_, getBinder()->getCurrentMaxCQI(nodeId));
+        mac_->emit(currentMaxRI_, getBinder()->getCurrentMaxRI(nodeId));
+    }
 }
 
 ActiveSet* LteSchedulerEnb::readActiveConnections()

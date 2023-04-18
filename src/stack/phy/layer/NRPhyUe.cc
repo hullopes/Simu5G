@@ -180,10 +180,11 @@ void NRPhyUe::handleAirFrame(cMessage* msg)
         int cw = lteInfo->getCw();
         if (lteInfo->getUserTxParams()->readCqiVector().size() == 1)
             cw = 0;
+        MacNodeId cellId = binder_->findUeInfoCellId(nodeId_);
         double cqi = lteInfo->getUserTxParams()->readCqiVector()[cw];
         //!VH dynamic CQI donwgrade
-        if (cqi > getBinder()->getCurrentMaxCQI())
-                    cqi = getBinder()->getCurrentMaxCQI();
+        if (cqi > getBinder()->getCurrentMaxCQI(cellId))
+                    cqi = getBinder()->getCurrentMaxCQI(cellId);
         if (lteInfo->getDirection() == DL)
         {
             emit(averageCqiDl_, cqi);

@@ -97,6 +97,7 @@ class CellInfo : public omnetpp::cSimpleModule
     int currentMaxRBs_;
     int currentMaxCQI_; //!VH In fact, it can be the same as the maximum modulation order, but it makes the process easier.
     int CNProcCapacity_;
+    int reductionPolicy_;
     //bool hasRU_; //either co-located RU or not
     std::string placementSolution_;
 

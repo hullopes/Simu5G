@@ -41,7 +41,8 @@ class LteMacUeD2D : public LteMacUe
     // if true, use the preconfigured TX params for transmission, else use that signaled by the eNB
     bool usePreconfiguredTxParams_;
     UserTxParams* preconfiguredTxParams_;
-    UserTxParams* getPreconfiguredTxParams();  // build and return new user tx params
+    //!VH change method to receive the cell MacNodeId
+    UserTxParams* getPreconfiguredTxParams(MacNodeId id);  // build and return new user tx params
 
 
     /**
